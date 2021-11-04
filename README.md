@@ -1,4 +1,4 @@
-# IB_autorader
+# IB_autotrader
 Opens and closes trades according to strategy specified in Amibroker
   - amibroker explore and scan files located in folder AMI/{strategy}_scan.csv
   - configuration file located in folder confg/settings
