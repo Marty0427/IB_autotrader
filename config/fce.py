@@ -11,9 +11,9 @@ ib = IB()
 
 def get_fills(api = True):
     '''
-    připojí se do TWS platformy
-    načte dnes exekuované objednávky a uloží je do dataframe exe a vrátí ho
-    odpojí API
+    connects to IBKR API
+    loads todays executions and returns a dataframe with it
+    disconnects API
     '''
     if api: #true znamená, že načte obchody přes API, jinak ze souboru trades.csv v tomto adresáři
         ib.connect(setIB['IP'], setIB['port'], setIB['clientID'])
@@ -31,18 +31,19 @@ def get_fills(api = True):
     return exe
 
 def get_close(ticker):
-    #vrátí close zadaného tickeru
+    #returns last close price of todays ticker
     data = pdr.get_data_yahoo(ticker)
     return round(data['Close'].iloc[-1],2)
 
 def index(df):
-    #změní index dataframu df od nuly do počtu řádků
+    #reindex the dataframe (better use .reset_index(drop = True)
     df.index = np.arange(0,len(df))
 
 def AMI_exit(strategy):
     '''
-    načte otevřené obchody strategie (strategy) a zapíše do df str_to_close obchody, které mají podle Amibrokeru vystoupit
-    volat před time_exit
+    loads open trades of a strategy ({strategy}_open.csv file)
+    returns a dataframe of tickers to close according to Amibroker scan file    
+    call before time_exit
     '''
     str_scan = pd.read_csv(f'AMI/{strategy}_scan.csv', sep = ',')
     str_scan_sell = str_scan[str_scan.Trade == 'Sell']
@@ -62,9 +63,8 @@ def AMI_exit(strategy):
                 
 def time_exit(strategy, days):
     '''
-    načte otevřené obchody strategie (strategy) a přidá do df(str_to_close) obchody, které jsou již daný 
-    počet dní (days) v pozici
-    volat až po AMI_exit
+    loads open trades of a strategy and appends tickers (after a defined days in position) to dataframe str_to_close
+    call after AMI_exit
     '''
     str_opened = pd.read_csv(f'Deník/{strategy}_open.csv', sep = ';')
     index(str_opened)
@@ -91,9 +91,8 @@ def time_exit(strategy, days):
 
 def enter(strategy, positions, Limit = False):
     '''
-    uloží do df str_to_open obchody, které podle strategie (strategy) mají vstoupit
-    seřadí podle sloupce (Score) a pokud není aktivován Limit,
-    ořízne dataframe na počet pozic (positions)
+    loads Amibroker explore file to a dataframe
+    sort the dataframe and slices it accordingly to a number of positions
     '''    
     
     str_explore = pd.read_csv(f'AMI/{strategy}_explore.csv')
@@ -126,10 +125,8 @@ def enter(strategy, positions, Limit = False):
 def rotate(strategy, positions):
 
     '''
-    používáno pro rotační strategie
-    vezme počet pozic (positions), které mají nejvyšší Score a porovná,
-    jestli je tato pozice již otevřena
-    vrátí df pozic, které ještě nejsou otevřen a které se mají zavřít
+    used for rotational strategies
+    compares open trades of a strategy with trades highest positionScore ticker from Amibroker and closes and opens accordingly
     '''
     
     str_explore = pd.read_csv(f'AMI/{strategy}_explore.csv')
@@ -149,8 +146,8 @@ def rotate(strategy, positions):
 
 def send_orders(strategy, Limit, positions):
     '''
-    odešle příkazy BUY podle df str_to_open a SELL podle df str_to_close strategie (strategy)
-    aktivuje limit
+    sends BUY orders according to a str_to_open dataframe and SELL orders according to a str_to_close dataframe
+    eventually activates Limit_order
     '''
     str_to_open['Contract'] = ''
     str_to_open['Order'] = ''
@@ -201,15 +198,15 @@ def send_orders(strategy, Limit, positions):
     
 def Limit_order(strategy,positions):
     '''
-    odešle objednávky všech obchodů podle Amibrokeru bez ohledu na Score, za nižší cenu než Close
-    každou vteřinu kontroluje, jestli došlo k otevření pozic
-    pokud dosáhne počet pozic, ostatní objednávky zruší
+    sends all orders from Amibroker explore file for a lower limit price
+    controls how many orders got open
+    cancels all orders if the  number of positions is as desired
     '''
     str_opened = pd.read_csv(f'Deník/{strategy}_open.csv', sep = ';')
     index(str_opened)
     to_open = positions - len(str_opened) + len(str_to_close)
 
-    #smyčka pro vstup 
+    #entry loop 
     str_now = 0
     while(str_now != to_open):
         exe = get_fills()
@@ -220,7 +217,7 @@ def Limit_order(strategy,positions):
         if str_now >= to_open:
             break
 
-    #smyčka pro zrušení objednávek
+    #cancel order loop
     for k in range(len(str_to_open)):
         try:
             ib.cancelOrder(str_to_open.Order[k])
@@ -230,15 +227,4 @@ def Limit_order(strategy,positions):
     ib.disconnect()
     print('Konec Limit')
 
-    
-def auto(strategy, positions, days, Limit = False):
-    '''
-    spojuje funkce, načte strategie z konfiguračního souboru
-    vystoupí z pozic podle Ami_exit, time_exit a vstoupí podle entry
-    '''
-    for i in SetStrat['strategy']:
-        str_to_close = AMI_exit(SetStrat['strategy'][i])
-        str_to_close = time_exit(SetStrat['strategy'][i], SetStrat['days'][i])
-        str_to_open = enter(SetStrat['strategy'][i], SetStrat['positions'][i],
-                            SetStrat['Limit'][i])
-        send_orders(SetStrat['strategy'][i], SetStrat['Limit'][i])
+
