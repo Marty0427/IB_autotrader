@@ -9,7 +9,7 @@ util.startLoop()
 from time import sleep
 ib = IB()
 
-def get_fills(api = True):
+def get_fills(api: bool) -> pd.DataFrame:
     '''
     connects to IBKR API
     loads todays executions and returns a dataframe with it
@@ -30,7 +30,7 @@ def get_fills(api = True):
     ib.disconnect()
     return exe
 
-def get_close(ticker):
+def get_close(ticker: str) -> float:
     #returns last close price of todays ticker
     data = pdr.get_data_yahoo(ticker)
     return round(data['Close'].iloc[-1],2)
@@ -39,7 +39,7 @@ def index(df):
     #reindex the dataframe (better use .reset_index(drop = True)
     df.index = np.arange(0,len(df))
 
-def AMI_exit(strategy):
+def AMI_exit(strategy: str) -> pd.DataFrame:
     '''
     loads open trades of a strategy ({strategy}_open.csv file)
     returns a dataframe of tickers to close according to Amibroker scan file    
@@ -61,7 +61,7 @@ def AMI_exit(strategy):
     str_to_close = str_to_close[str_to_close.Vstup == (dt.date.today() - dt.timedelta(days = 1))]
     return str_to_close
                 
-def time_exit(strategy, days):
+def time_exit(strategy: str, days: int) -> pd.DataFrame:
     '''
     loads open trades of a strategy and appends tickers (after a defined days in position) to dataframe str_to_close
     call after AMI_exit
@@ -89,7 +89,7 @@ def time_exit(strategy, days):
     return str_to_close
 
 
-def enter(strategy, positions, Limit = False):
+def enter(strategy: str, positions: int, Limit = False) -> pd.DataFrame:
     '''
     loads Amibroker explore file to a dataframe
     sort the dataframe and slices it accordingly to a number of positions
@@ -122,7 +122,7 @@ def enter(strategy, positions, Limit = False):
     
     
 
-def rotate(strategy, positions):
+def rotate(strategy: str, positions: int) -> pd.DataFrame, pd.DataFrame:
 
     '''
     used for rotational strategies
@@ -144,7 +144,7 @@ def rotate(strategy, positions):
     return str_to_close, str_to_open
 
 
-def send_orders(strategy, Limit, positions):
+def send_orders(strategy: str, Limit: bool, positions: int):
     '''
     sends BUY orders according to a str_to_open dataframe and SELL orders according to a str_to_close dataframe
     eventually activates Limit_order
@@ -196,7 +196,7 @@ def send_orders(strategy, Limit, positions):
         Limit_order(strategy, positions)    
 
     
-def Limit_order(strategy,positions):
+def Limit_order(strategy: str, positions: int):
     '''
     sends all orders from Amibroker explore file for a lower limit price
     controls how many orders got open
@@ -217,7 +217,7 @@ def Limit_order(strategy,positions):
         if str_now >= to_open:
             break
 
-    #cancel order loop
+    #cancel loop
     for k in range(len(str_to_open)):
         try:
             ib.cancelOrder(str_to_open.Order[k])
